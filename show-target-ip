@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if  [[ $1 = "-v" && -s /tmp/target.txt ]]; then
+    label="Target="
+else
+    label=""
+fi
+
+vic=$(cat /tmp/target.txt)
+
+echo "$label$vic"

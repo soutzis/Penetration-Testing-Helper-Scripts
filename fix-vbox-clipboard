@@ -1,0 +1,8 @@
+#!/bin/bash
+pid_1=$(ps aux | grep VBox | grep -m 1 clipboard | awk -F ' ' '{print $2}')
+pid_2=$(ps aux | grep VBox | grep clipboard | tail -n 1 | awk -F ' ' '{print $2}')
+
+kill $pid_1
+kill $pid_2
+
+VBoxClient --clipboard

